@@ -1,0 +1,1 @@
+select groups,series_reference,status,sum(data_value) from spark_tab_local group by groups,series_reference,status  

@@ -1,0 +1,5 @@
+select series_title_1, data_value from spark_tab_local 
+union 
+select series_title_1, data_value from spark_tab_central 
+union
+select series_title_1, data_value from spark_tab_general

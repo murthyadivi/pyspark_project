@@ -1,0 +1,8 @@
+select  a.series_reference,a.Series_title_1,sum(a.data_value) as local_sum,sum(b.data_value) as central_sum,sum(c.data_value) as general_sum
+     
+       from spark_tab_local a Join spark_tab_central b
+       on  a.Series_title_1   = b.Series_title_1	
+       join spark_tab_general c	
+       on  a.Series_title_1   = c.Series_title_1
+       group by a.series_reference,a.Series_title_1   	
+                                                  

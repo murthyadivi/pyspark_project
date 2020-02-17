@@ -1,0 +1,66 @@
+sqoop import --bindir /usr/lib/sqoop --connect jdbc:mysql://localhost:3306/sqoopex --username root --password-file /root/etloffload/sqoop.password --split-by data_value --columns series_reference,period,data_value,status,units,magnitude,subject,groups,series_title_1,series_title_2,series_title_3,series_title_4,series_title_5 --table local_finance --delete-target-dir --target-dir /root/sqoopex_import/local_data --fields-terminated-by "," --hive-import --hive-overwrite --hive-table etloffload.local_finance
+
+sqoop import --bindir /usr/lib/sqoop --connect jdbc:mysql://localhost:3306/sqoopex --username root --password-file /root/etloffload/sqoop.password --split-by data_value --columns series_reference,period,data_value,status,units,magnitude,subject,groups,series_title_1,series_title_2,series_title_3,series_title_4,series_title_5 --table central_finance --delete-target-dir --target-dir /root/sqoopex_import/central_data --fields-terminated-by "," --hive-import --hive-overwrite --hive-table etloffload.central_finance
+
+sqoop import --bindir /usr/lib/sqoop --connect jdbc:mysql://localhost:3306/sqoopex --username root --password-file /root/etloffload/sqoop.password --split-by data_value --columns series_reference,period,data_value,status,units,magnitude,subject,groups,series_title_1,series_title_2,series_title_3,series_title_4,series_title_5 --table general_finance --delete-target-dir --target-dir /root/sqoopex_import/general_data --fields-terminated-by "," --hive-import --hive-overwrite --hive-table etloffload.general_finance
+
+Check for the files in Hive by running the command : hadoop fs -ls /user/hive/warehouse/etloffload.db
+
+
+from pyspark.sql.types import * 
+// contains methods such as formatting floating data types for decimal places,
+
+from pyspark.sql import SQLContext 
+// In order to handle structured data, we need SQLContext to make transformations using queries
+
+from pyspark.sql.functions import col 
+// To get the content of columns from data frame
+
+from pyspark.sql import HiveContext 
+// To access hive tables from Spark, HiveContext needs to be initialized
+
+
+hive_context = HiveContext(sc)
+df_local_finance = hive_context.table("etloffload.local_finance")
+df_central_finance = hive_context.table("etloffload.central_finance")
+df_general_finance = hive_context.table("etloffload.general_finance")
+
+
+df_local_finance.createOrReplaceTempView("spark_tab_local")
+df_central_finance.createOrReplaceTempView("spark_tab_central")
+df_general_finance.createOrReplaceTempView("spark_tab_general")
+
+
+query_01 = open("/root/etloffload/query_files/query_01.txt")
+query01 = query_01.read()
+df_q1 = sqlContext.sql(query01).filter(col('status').isin(['FINAL','REVISED']) == True)
+df_q1.createOrReplaceTempView("temp_tab01")
+
+
+query_02 = open("/root/etloffload/query_files/query_02.txt")
+query02 = query_02.read()
+df2 = sqlContext.sql(query02).groupBy("Series_title_1").avg("data_value")
+df2_new = df2.withColumnRenamed("avg(data_value)","avd_value")
+from pyspark.sql.functions import avg, format_number
+df_q2=df2_new.select(['Series_title_1',format_number('avd_value', 3).alias("avg_data_value")])
+df_q2.createOrReplaceTempView("temp_tab02")
+
+
+
+
+
+query_03 = open("/root/etloffload/query_files/query_03.txt")
+query03 = query_03.read()
+df_q3 = sqlContext.sql(query03)
+df_q3.withColumnRenamed("avg(data_value)","avd_value_local") // renaming the columns after calculating the average
+df_q3.withColumnRenamed("avg(data_value)","avd_value_central")
+df_q3.withColumnRenamed("avg(data_value)","avd_value_general")
+df_q3.createOrReplaceTempView("temp_tab03")
+
+
+hive_context.sql("DROP TABLE IF EXISTS etloffload.htab01")
+hive_context.sql("create table etloffload.htab01 as select * from temp_tab01");
+hive_context.sql("DROP TABLE IF EXISTS etloffload.htab02")
+hive_context.sql("create table etloffload.htab02 as select * from temp_tab02");
+hive_context.sql("create table etloffload.htab03 as select * from temp_tab03");
+
